@@ -1,18 +1,19 @@
 import express from "express";
 import { createHandler } from "graphql-http/lib/use/express";
+import cors from "cors";
 import {
   GraphQLSchema,
   GraphQLObjectType,
   GraphQLString,
   GraphQLNonNull,
-  GraphQLInt,
-  GraphQLFloat,
-  GraphQLList,
 } from "graphql";
 import dotenv from "dotenv";
 import mondodb, { ObjectId } from "mongodb";
+import UserType from "./Types/UserType.js";
+import CompanyType from "./Types/CompanyType.js";
 dotenv.config();
 const app = express();
+app.use(cors());
 
 const client = new mondodb.MongoClient(process.env.COLABB_DB_URI);
 
@@ -27,45 +28,9 @@ const port = process.env.PORT || 8000;
 app.listen(port);
 await connectionWithCompanies.createIndex({ code: 1 }, { unique: true });
 
-const UserType = new GraphQLObjectType({
-  name: "user",
-  description: "This represents a user",
-  fields: () => ({
-    _id: { type: new GraphQLNonNull(GraphQLString) },
-    email: { type: new GraphQLNonNull(GraphQLString) },
-    password: { type: new GraphQLNonNull(GraphQLString) },
-    companies: {
-      type: new GraphQLList(CompanyType),
-      resolve: async (parent, args) => {
-        const companyIds = parent.companies;
-        const companies = await connectionWithCompanies.find({
-          _id: { $in: companyIds.map(id => new ObjectId(id)) }
-        }).toArray();
-        return companies;
-      }
-    },
-  }),
-});
-
-const CompanyType = new GraphQLObjectType({
-  name: "company",
-  description: "This represents a company",
-  fields: () => ({
-    _id: { type: new GraphQLNonNull(GraphQLString) },
-    name: { type: new GraphQLNonNull(GraphQLString) },
-    users: {
-      type: new GraphQLList(UserType),
-      resolve: async (parent, args) => {
-        const userIds = parent.users;
-        const users = await connectionWithUser.find({
-          _id: { $in: userIds.map(id => new ObjectId(id)) }
-        }).toArray();
-        console.log(users)
-        return users;
-      }
-    },
-  }),
-});
+export const connectionWithCompaniesExport = connectionWithCompanies;
+export const connectionWithUserExport = connectionWithUser;
+export const clientExport = client;
 
 const RootMutationType = new GraphQLObjectType({
   name: "mutation",
@@ -75,41 +40,48 @@ const RootMutationType = new GraphQLObjectType({
       type: UserType,
       description: "Add User",
       args: {
-        password: { type: GraphQLNonNull(GraphQLString) },
-        email: { type: GraphQLNonNull(GraphQLString) },
+        password: { type: new GraphQLNonNull(GraphQLString) },
+        email: { type: new GraphQLNonNull(GraphQLString) },
       },
       resolve: async (parent, args) => {
-        const res = await connectionWithUser.insertOne({password:pass, email:email});
-        return res
+        const res = await connectionWithUser.insertOne({
+          password: pass,
+          email: email,
+        });
+        return res;
       },
     },
     addCompany: {
       type: CompanyType,
       description: "Add Company",
       args: {
-        code: { type: GraphQLNonNull(GraphQLString) },
-        name: { type: GraphQLNonNull(GraphQLString) },
-        adminUser: {type: GraphQLString}
+        code: { type: new GraphQLNonNull(GraphQLString) },
+        name: { type: new GraphQLNonNull(GraphQLString) },
+        adminUser: { type: GraphQLString },
       },
       resolve: async (parent, args) => {
-        const res = await connectionWithCompanies.insertOne({code:args.code, name:args.name, adminUser:args.adminUser});
-        return res
+        const res = await connectionWithCompanies.insertOne({
+          code: args.code,
+          name: args.name,
+          adminUser: args.adminUser,
+        });
+        return res;
       },
     },
     joinCompany: {
       type: CompanyType,
       description: "Add user to a company",
       args: {
-        code: { type: GraphQLNonNull(GraphQLString) },
-        id: { type: GraphQLNonNull(GraphQLString) },
+        code: { type: new GraphQLNonNull(GraphQLString) },
+        id: { type: new GraphQLNonNull(GraphQLString) },
       },
       resolve: async (parent, args) => {
         const res = await connectionWithCompanies.updateOne(
-           { code: args.code },
-           { $push: { users: args.id } }
+          { code: args.code },
+          { $push: { users: args.id } }
         );
         return res;
-       },
+      },
     },
   }),
 });
@@ -118,7 +90,7 @@ const RootQueryType = new GraphQLObjectType({
   name: "query",
   description: "Root Query",
   fields: () => ({
-    user: {
+    getUser: {
       type: UserType,
       description: "One user",
       args: {
