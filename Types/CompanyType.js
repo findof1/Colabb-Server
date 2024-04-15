@@ -1,6 +1,12 @@
-import { GraphQLObjectType, GraphQLNonNull, GraphQLString, GraphQLList } from "graphql";
-import { connectionWithUserExport } from '../server.js'
+import {
+  GraphQLObjectType,
+  GraphQLNonNull,
+  GraphQLString,
+  GraphQLList,
+} from "graphql";
+import { connectionWithUserExport } from "../server.js";
 import UserType from "./UserType.js";
+import { ObjectId } from "mongodb";
 const CompanyType = new GraphQLObjectType({
   name: "company",
   description: "This represents a company",
@@ -10,15 +16,16 @@ const CompanyType = new GraphQLObjectType({
     users: {
       type: new GraphQLList(UserType),
       resolve: async (parent, args) => {
-        const userIds = parent.users;
-        const users = await connectionWithUserExport.find({
-          _id: { $in: userIds.map(id => new ObjectId(id)) }
-        }).toArray();
-        console.log(users)
+        const usersData = parent.users;
+        const users = await connectionWithUserExport
+          .find({
+            _id: { $in: usersData.map((user) => new ObjectId(user.id)) },
+          })
+          .toArray();
         return users;
-      }
+      },
     },
   }),
 });
 
-export default CompanyType
+export default CompanyType;

@@ -44,11 +44,19 @@ const RootMutationType = new GraphQLObjectType({
         email: { type: new GraphQLNonNull(GraphQLString) },
       },
       resolve: async (parent, args) => {
-        const res = await connectionWithUser.insertOne({
-          password: pass,
-          email: email,
-        });
-        return res;
+        let userCreated = await connectionWithUser.find({ email: args.email });
+        userCreated = await userCreated.toArray();
+        if (userCreated.length === 0) {
+          const res = await connectionWithUser.insertOne({
+            password: args.password,
+            email: args.email,
+          });
+          return {
+            password: args.password,
+            email: args.email,
+            _id: res.insertedId,
+          };
+        }
       },
     },
     addCompany: {
@@ -78,9 +86,10 @@ const RootMutationType = new GraphQLObjectType({
       resolve: async (parent, args) => {
         const res = await connectionWithCompanies.updateOne(
           { code: args.code },
-          { $push: { users: args.id } }
+          { $push: { users: { id: args.id, role: "employee" } } }
         );
-        return res;
+        const company = await connectionWithCompanies.find({code:args.code}).toArray()[0]
+        return company;
       },
     },
   }),
@@ -119,7 +128,6 @@ const RootQueryType = new GraphQLObjectType({
           _id: objId,
         });
         company = await company.toArray();
-        console.log(company);
         return company[0];
       },
     },
